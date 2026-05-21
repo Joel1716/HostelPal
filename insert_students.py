@@ -14,8 +14,13 @@ def insert_students():
     ]
     
     cursor.executemany('''
-    INSERT OR REPLACE INTO students (matric_number, name, hostel, room_number, enrolled)
+    INSERT INTO students (matric_number, name, hostel, room_number, enrolled)
     VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(matric_number) DO UPDATE SET
+        name=excluded.name,
+        hostel=excluded.hostel,
+        room_number=excluded.room_number,
+        enrolled=excluded.enrolled
     ''', students)
     
     conn.commit()

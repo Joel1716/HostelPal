@@ -1,9 +1,11 @@
 import streamlit as st
 import sqlite3
 import socket
+import requests
 from datetime import datetime
 
 st.set_page_config(page_title="Smart Hostel Bed-Check", page_icon="🛏️", layout="centered")
+
 st.title("🛏️ Smart Hostel Bed-Check System")
 st.markdown("---")
 
@@ -13,40 +15,28 @@ if 'step' not in st.session_state:
 if 'student_data' not in st.session_state:
     st.session_state.student_data = None
 
-import streamlit as st
-import requests
-
-def get_public_ip():
-    """
-    Get student's actual public IP address.
-    Works on both local and deployed (Streamlit Cloud).
-    """
-    # Method 1: Try to get from request headers (works on Streamlit Cloud)
+def get_local_ip():
+    # Try to get from Streamlit headers (works if behind a proxy or on Streamlit Cloud)
     try:
-        # For newer Streamlit versions
         if hasattr(st, 'context') and hasattr(st.context, 'headers'):
             headers = st.context.headers
             if 'X-Forwarded-For' in headers:
-                ip = headers['X-Forwarded-For'].split(',')[0]
-                if ip and ip != '127.0.0.1':
-                    return ip
+                return headers['X-Forwarded-For'].split(',')[0]
             if 'X-Real-IP' in headers:
-                ip = headers['X-Real-IP']
-                if ip and ip != '127.0.0.1':
-                    return ip
+                return headers['X-Real-IP']
     except:
         pass
-    
-    # Method 2: Use external API (works everywhere)
+
+    # Fallback to socket for local machine IP
     try:
-        response = requests.get('https://api.ipify.org', timeout=5)
-        if response.status_code == 200:
-            return response.text
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
     except:
-        pass
-    
-    # Method 3: Fallback for local testing
-    return '127.0.0.1'
+        return "127.0.0.1"
+
 
 def get_student_by_matric(matric_number):
     conn = sqlite3.connect('hostel.db')
@@ -83,6 +73,8 @@ def has_checked_in_today(matric_number):
 
 def check_subnet_ip(expected_subnet, current_ip):
     """Check if current IP starts with expected subnet"""
+    if expected_subnet is None:
+        return False, "❌ Subnet error: No subnet defined for this hostel in the database."
     if current_ip.startswith(expected_subnet):
         return True, f"✅ IP verified: {current_ip} is in {expected_subnet}x subnet"
     else:
