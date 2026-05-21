@@ -4,7 +4,7 @@ import requests
 from datetime import datetime
 
 st.set_page_config(page_title="Smart Hostel Bed-Check", page_icon="🛏️", layout="centered")
-st.title("HostelPal")
+st.title("HostelPal 🔥")
 st.markdown("---")
 
 # Session state
@@ -24,39 +24,35 @@ def get_public_ip():
         if hasattr(st, 'context') and hasattr(st.context, 'headers'):
             headers = st.context.headers
             
-            # Common headers used by Proxies/Load Balancers to forward client IP
-            # We check both capitalized and lowercase just in case
-            ip_headers = [
-                'X-Forwarded-For', 
-                'x-forwarded-for',
-                'X-Real-IP', 
-                'x-real-ip',
-                'Cf-Connecting-Ip',
-                'cf-connecting-ip'
-            ]
-            
-            for header in ip_headers:
-                if header in headers:
-                    # Can contain a comma-separated list of proxies; the first one is the student
-                    ip = headers[header].split(',')[0].strip()
-                    if ip and ip != '127.0.0.1' and ip != '::1':
+            # Streamlit Cloud explicitly forwards the client IP through this header
+            if 'X-Forwarded-For' in headers:
+                # Can contain a comma-separated list of proxies; the first one is the student
+                ip = headers['X-Forwarded-For'].split(',')[0].strip()
+                if ip and ip != '127.0.0.1':
+                    return ip
+                    
+            # Fallback headers commonly passed by various reverse proxies
+            for header_name in ['X-Real-IP', 'X-Client-IP', 'Cf-Connecting-Ip']:
+                if header_name in headers:
+                    ip = headers[header_name].strip()
+                    if ip and ip != '127.0.0.1':
                         return ip
-    except Exception:
+    except Exception as e:
+        # Silently catch context errors (useful if testing on an older Streamlit version)
         pass
 
     # Method 2: If we are running locally (localhost), your server and client are on the 
     # same machine, so requests.get works perfectly to find your local router's public IP.
     try:
-        # Using a reliable service to get the external IP
-        response = requests.get('https://api.ipify.org', timeout=5)
+        response = requests.get('https://api.ipify.org', timeout=3)
         if response.status_code == 200:
             ip = response.text.strip()
             if ip:
                 return ip
-    except Exception:
+    except:
         pass
 
-    # Fallback default if completely offline/isolated or on localhost without headers
+    # Fallback default if completely offline/isolated
     return '127.0.0.1'
 
 def get_student_by_matric(matric_number):
@@ -96,14 +92,10 @@ def check_subnet_ip(expected_subnet, current_ip):
     """Check if current IP starts with expected subnet"""
     if expected_subnet is None:
         return False, "❌ Subnet error: No subnet defined for this hostel in the database."
-    
-    if current_ip == '127.0.0.1':
-        return False, "⚠️ Warning: Detected Localhost (127.0.0.1). If you are on a phone/distant PC, ensure you aren't on a local development server."
-
     if current_ip.startswith(expected_subnet):
-        return True, f"✅ IP verified: {current_ip} matches expected subnet {expected_subnet}x"
+        return True, f"✅ IP verified: {current_ip} is in {expected_subnet}x subnet"
     else:
-        return False, f"❌ IP check failed: Your detected IP is {current_ip}, but the hostel requires {expected_subnet}x."
+        return False, f"❌ IP check failed: {current_ip} is NOT in {expected_subnet}x subnet"
 
 # ============================================
 # STEP 1: Matric Number
