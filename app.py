@@ -13,17 +13,40 @@ if 'step' not in st.session_state:
 if 'student_data' not in st.session_state:
     st.session_state.student_data = None
 
-def get_local_ip():
-    """Get the computer's current IP address"""
+import streamlit as st
+import requests
+
+def get_public_ip():
+    """
+    Get student's actual public IP address.
+    Works on both local and deployed (Streamlit Cloud).
+    """
+    # Method 1: Try to get from request headers (works on Streamlit Cloud)
     try:
-        # Create a socket to get the local IP
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
+        # For newer Streamlit versions
+        if hasattr(st, 'context') and hasattr(st.context, 'headers'):
+            headers = st.context.headers
+            if 'X-Forwarded-For' in headers:
+                ip = headers['X-Forwarded-For'].split(',')[0]
+                if ip and ip != '127.0.0.1':
+                    return ip
+            if 'X-Real-IP' in headers:
+                ip = headers['X-Real-IP']
+                if ip and ip != '127.0.0.1':
+                    return ip
     except:
-        return "127.0.0.1"
+        pass
+    
+    # Method 2: Use external API (works everywhere)
+    try:
+        response = requests.get('https://api.ipify.org', timeout=5)
+        if response.status_code == 200:
+            return response.text
+    except:
+        pass
+    
+    # Method 3: Fallback for local testing
+    return '127.0.0.1'
 
 def get_student_by_matric(matric_number):
     conn = sqlite3.connect('hostel.db')
@@ -134,14 +157,4 @@ elif st.session_state.step == 'location':
             st.session_state.step = 'matric'
             st.session_state.student_data = None
             st.rerun()
-
-# ============================================
-# STEP 3: GPS (Coming)
-# ============================================
-elif st.session_state.step == 'gps':
-    st.subheader("Step 3: GPS Geofencing (Coming Soon)")
-    st.write("📍 GPS check with Haversine formula will be added next.")
     
-    if st.button("Back to Network Check"):
-        st.session_state.step = 'location'
-        st.rerun()
