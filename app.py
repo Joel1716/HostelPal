@@ -1,6 +1,6 @@
 import streamlit as st
 import sqlite3
-import socket
+import requests
 from datetime import datetime
 
 st.set_page_config(page_title="Smart Hostel Bed-Check", page_icon="🛏️", layout="centered")
@@ -13,17 +13,38 @@ if 'step' not in st.session_state:
 if 'student_data' not in st.session_state:
     st.session_state.student_data = None
 
-def get_local_ip():
-    """Get the computer's current IP address"""
+def get_public_ip():
+    """
+    Get the student's REAL public IP address.
+    Works on both localhost and deployed Streamlit Cloud.
+    """
+    # Method 1: Try to get from Streamlit Cloud request headers (fastest)
     try:
-        # Create a socket to get the local IP
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
+        if hasattr(st, 'context') and hasattr(st.context, 'headers'):
+            headers = st.context.headers
+            if 'X-Forwarded-For' in headers:
+                ip = headers['X-Forwarded-For'].split(',')[0].strip()
+                if ip and ip != '127.0.0.1':
+                    return ip
+            if 'X-Real-IP' in headers:
+                ip = headers['X-Real-IP'].strip()
+                if ip and ip != '127.0.0.1':
+                    return ip
     except:
-        return "127.0.0.1"
+        pass
+    
+    # Method 2: Use external API (slower, but works everywhere)
+    try:
+        response = requests.get('https://api.ipify.org', timeout=5)
+        if response.status_code == 200:
+            ip = response.text.strip()
+            if ip:
+                return ip
+    except:
+        pass
+    
+    # Method 3: Fallback for local testing
+    return '127.0.0.1'
 
 def get_student_by_matric(matric_number):
     conn = sqlite3.connect('hostel.db')
@@ -90,7 +111,7 @@ if st.session_state.step == 'matric':
                 st.rerun()
 
 # ============================================
-# STEP 2: Subnet IP Check (Gate A)
+# STEP 2: Public IP Check (Gate A) with Loader
 # ============================================
 elif st.session_state.step == 'location':
     st.subheader("Step 2: Network Verification (Gate A)")
@@ -104,43 +125,60 @@ elif st.session_state.step == 'location':
     
     st.markdown("---")
     
-    # Get current computer IP
-    current_ip = get_local_ip()
-    st.write(f"**Your Current IP Address:** `{current_ip}`")
+    # Only run IP check if not already done
+    if 'ip_checked' not in st.session_state:
+        st.session_state.ip_checked = False
+        st.session_state.ip_passed = False
+        st.session_state.ip_message = ""
+        st.session_state.current_ip = ""
     
-    # Check if IP matches
-    passed, message = check_subnet_ip(student['subnet'], current_ip)
+    if not st.session_state.ip_checked:
+        # Show loader while checking IP
+        with st.spinner("Checking your network connection... Please wait."):
+            current_ip = get_public_ip()
+            passed, message = check_subnet_ip(student['subnet'], current_ip)
+            
+            st.session_state.current_ip = current_ip
+            st.session_state.ip_passed = passed
+            st.session_state.ip_message = message
+            st.session_state.ip_checked = True
+        
+        st.rerun()
     
-    if passed:
-        st.success(message)
+    # Show results (from saved session state)
+    st.write(f"**Your Public IP Address:** `{st.session_state.current_ip}`")
+    
+    if st.session_state.ip_passed:
+        st.success(st.session_state.ip_message)
         st.markdown("---")
         st.write("✅ **Gate A passed!** You are on the correct network.")
         
         if st.button("Continue to Next Step"):
-            st.session_state.step = 'gps'
+            st.session_state.step = 'face'
             st.rerun()
     else:
-        st.error(message)
-        st.markdown("---")
-        st.warning("""
-        **To pass this check:**
-        - Connect to the Wi-Fi network that matches your hostel
-        - For Mark Hostel, your IP should start with `{expected_subnet}`
-        """)
-        
-        if st.button("Try Again (Switch Network)"):
+        st.error(st.session_state.ip_message)
+        if st.button("Try Again"):
+            # Reset IP check so it runs again
+            st.session_state.ip_checked = False
             st.rerun()
         if st.button("Back to Start"):
             st.session_state.step = 'matric'
             st.session_state.student_data = None
+            # Clear IP check session data
+            for key in ['ip_checked', 'ip_passed', 'ip_message', 'current_ip']:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun()
+         
 
 # ============================================
-# STEP 3: GPS (Coming)
+# STEP 3: Face Recognition (Coming)
 # ============================================
-elif st.session_state.step == 'gps':
-    st.subheader("Step 3: GPS Geofencing (Coming Soon)")
-    st.write("📍 GPS check with Haversine formula will be added next.")
+elif st.session_state.step == 'face':
+    st.subheader("Step 3: Face Verification")
+    st.write("Face recognition with VGG-Face and EAR liveness will be added here.")
+    st.write(f"**Student:** {st.session_state.student_data['name']}")
     
     if st.button("Back to Network Check"):
         st.session_state.step = 'location'
