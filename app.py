@@ -4,7 +4,7 @@ import requests
 from datetime import datetime
 
 st.set_page_config(page_title="Smart Hostel Bed-Check", page_icon="🛏️", layout="centered")
-st.title("🛏️ Smart Hostel Bed-Check System")
+st.title("HostelPal")
 st.markdown("---")
 
 # Session state
