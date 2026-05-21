@@ -15,8 +15,8 @@ def add_subnet_column():
     # Update each student with their hostel's subnet
     subnets = {
         'Mark Hostel': '192.168.110.',
-        'Luke Hostel': '196.43.235.34',
-        'Matthew Hostel': '192.168.3.',
+        'Luke Hostel': '102.89.85.',
+        'Matthew Hostel': '129.205.121.',
         'John Hostel': '192.168.4.',
     }
     
