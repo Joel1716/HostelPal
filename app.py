@@ -16,37 +16,44 @@ if 'student_data' not in st.session_state:
 
 def get_public_ip():
     """
-    Get the student's REAL public IP address.
-    Works on both localhost and deployed Streamlit Cloud.
+    Get the student's REAL public IP address from the browser client.
+    Works on both local environments and deployed Streamlit Cloud.
     """
-    # Method 1: Try to get from Streamlit Cloud request headers (fastest)
+    # Method 1: Check Streamlit context headers for the proxy client IP
     try:
         if hasattr(st, 'context') and hasattr(st.context, 'headers'):
             headers = st.context.headers
+            
+            # Streamlit Cloud explicitly forwards the client IP through this header
             if 'X-Forwarded-For' in headers:
+                # Can contain a comma-separated list of proxies; the first one is the student
                 ip = headers['X-Forwarded-For'].split(',')[0].strip()
                 if ip and ip != '127.0.0.1':
                     return ip
-            if 'X-Real-IP' in headers:
-                ip = headers['X-Real-IP'].strip()
-                if ip and ip != '127.0.0.1':
-                    return ip
-    except:
+                    
+            # Fallback headers commonly passed by various reverse proxies
+            for header_name in ['X-Real-IP', 'X-Client-IP', 'Cf-Connecting-Ip']:
+                if header_name in headers:
+                    ip = headers[header_name].strip()
+                    if ip and ip != '127.0.0.1':
+                        return ip
+    except Exception as e:
+        # Silently catch context errors (useful if testing on an older Streamlit version)
         pass
-    
-    # Method 2: Use external API (slower, but works everywhere)
+
+    # Method 2: If we are running locally (localhost), your server and client are on the 
+    # same machine, so requests.get works perfectly to find your local router's public IP.
     try:
-        response = requests.get('https://api.ipify.org', timeout=5)
+        response = requests.get('https://api.ipify.org', timeout=3)
         if response.status_code == 200:
             ip = response.text.strip()
             if ip:
                 return ip
     except:
         pass
-    
-    # Method 3: Fallback for local testing
-    return '127.0.0.1'
 
+    # Fallback default if completely offline/isolated
+    return '127.0.0.1'
 
 def get_student_by_matric(matric_number):
     conn = sqlite3.connect('hostel.db')
@@ -187,3 +194,4 @@ elif st.session_state.step == 'face':
     if st.button("Back to Network Check"):
         st.session_state.step = 'location'
         st.rerun()
+
