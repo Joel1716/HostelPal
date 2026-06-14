@@ -64,7 +64,7 @@ export default function Signup() {
         className="bg-slate-900 border border-slate-800 rounded-2xl p-8 w-full max-w-md"
       >
         <h1 className="text-2xl font-bold text-white mb-1">Staff Signup</h1>
-        <p className="text-slate-500 text-sm mb-6">HostelPal Admin</p>
+        {/* <p className="text-slate-500 text-sm mb-6">HostelPal Admin</p> */}
 
         <div className="space-y-4">
           <input
