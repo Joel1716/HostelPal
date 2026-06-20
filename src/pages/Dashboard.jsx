@@ -148,6 +148,12 @@ export default function Dashboard() {
           </div>
 
           <button
+            onClick={() => navigate("/settings")}
+            className="text-sm text-slate-400 hover:text-white border border-slate-700 rounded-lg px-4 py-2 transition"
+          >
+            Settings
+          </button>
+          <button
             onClick={handleLogout}
             className="text-sm text-slate-400 hover:text-white border border-slate-700 rounded-lg px-4 py-2 transition"
           >
